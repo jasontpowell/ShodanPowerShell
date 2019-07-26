@@ -323,7 +323,7 @@ function Search-Shodan {
         $QueryParameters["key"] =  [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($ApiKey))
         $QueryParameters["page"] = $Page 
 
-        if ($Minify -ne "") {
+        if ($Minify) {
             $QueryParameters["minify"] = $true
         }
 
