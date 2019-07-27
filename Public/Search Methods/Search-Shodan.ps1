@@ -316,6 +316,8 @@ function Search-Shodan {
         # Shodan search query. The provided string is used to search the database of banners in Shodan.
         $Query = New-Object Hashtable
 
+        $MatchResults = New-Object System.Collections.ArrayList
+
         $Method = "get"
         $BaseUri = "https://api.shodan.io"
         $Path = "/shodan/host/search"
@@ -548,25 +550,72 @@ function Search-Shodan {
             Body    = $QueryParameters
         }
 
-        try {
-            $Response = Invoke-WebRequest @RequestArgs -ErrorAction Stop
-         
-            $QueryParameters["key"] = $null
-            [System.GC]::Collect()
 
-            $ResponseContent = $Response.Content | ConvertFrom-Json
+        for (($CurrentPage = 1), ($CompletedAllPages = $false); $CompletedAllPages -ne $true; $CurrentPage++) {
+            $RequestArgs["Body"]["page"] = $CurrentPage
+
+            try {
+                $Response = Invoke-WebRequest @RequestArgs -ErrorAction Stop
+                $ResponseContent = $Response.Content | ConvertFrom-Json
+                
+                $MatchResults.AddRange( $ResponseContent.matches )
+
+                $PageCount = [math]::Round( ($ResponseContent.total / 100), 0 )
+
+                [Int32]$PercentComplete = ( $MatchResults.Count / $ResponseContent.total ) * 100
+                $ProgressArgs = @{
+                    Activity            = "Downloading results for Shodan query: $ShodanQueryString"
+                    CurrentOperation    = "Downloaded $($MatchResults.Count) of $($ResponseContent.total) matches"
+                    PercentComplete     = $PercentComplete
+                    Status              = "Page $CurrentPage of $PageCount"
+                }
     
-            Write-Output $ResponseContent
-        }
-        catch {
-            # $StatusCode = $($_.Exception.Response.StatusCode.value__)                
-            # $Message = $_.ToString()
-            # $Headers = $_.Exception.Response.Headers
-            $ErrorObject = $PSItem
+                Write-Progress @ProgressArgs
 
-            $PSCmdlet.ThrowTerminatingError($ErrorObject)
+                if ($CurrentPage -eq $PageCount ) {
+                    $CompletedAllPages = $true
+                }
+
+                Start-Sleep -Seconds 1
+            }
+            catch {
+                $Message = $_.ToString() | ConvertFrom-Json | Select-Object -ExpandProperty error
+                $ErrorObject = $PSItem
+
+                switch ($Message) {
+                    {$_ -like "*request timed out*"} {
+
+                        [Int32]$PercentComplete = ( $MatchResults.Count / $ResponseContent.total ) * 100
+                        $ProgressArgs = @{
+                            Activity            = "Downloading results for Shodan query: $ShodanQueryString"
+                            CurrentOperation    = "Downloaded $($MatchResults.Count) of $($ResponseContent.total) matches"
+                            PercentComplete     = $PercentComplete
+                            Status              = "The request timed out--retrying in 5 seconds..."
+                        }
+            
+                        Write-Progress @ProgressArgs
+
+                        Start-Sleep -Seconds 5
+                        $CurrentPage--
+                    }
+                    Default {
+                        $QueryParameters["key"] = $null
+                        [System.GC]::Collect()
+
+                        # TODO: Capture the last page that was successfully downloaded and output it so I can know where to pick up the query next time.
+                
+                        Write-Output $MatchResults
+
+                        $PSCmdlet.ThrowTerminatingError($ErrorObject)
+                    }
+                }
+            }
         }
+               
+        $QueryParameters["key"] = $null
+        [System.GC]::Collect()
+
+        Write-Output $MatchResults
     }
-
     end {}
 }
