@@ -11,7 +11,7 @@ $SearchArguments = @{
     # Product  = "WEBCAM"
 }
 
-$Results = (Search-Shodan @SearchArguments).matches
+$Results = Search-Shodan @SearchArguments
 
 $Hosts = New-Object System.Collections.ArrayList
 

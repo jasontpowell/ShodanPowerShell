@@ -36,10 +36,10 @@ function Search-Shodan {
         [String[]]
         $Facets,
 
-        # The page number to page through results 100 at a time (default: 1)
+        # The number of pages to download.  There are 100 results per page.  Default is to download all pages.
         [Parameter()]
         [Int16]
-        $Page = 1,
+        $Pages,
 
         # True to only return the list of ports and the general host information, no banners
         [Parameter()]
@@ -572,7 +572,7 @@ function Search-Shodan {
     
                 Write-Progress @ProgressArgs
 
-                if ($CurrentPage -eq $PageCount ) {
+                if ($CurrentPage -eq $PageCount -or $CurrentPage -eq $Pages) {
                     $CompletedAllPages = $true
                 }
 
@@ -585,11 +585,9 @@ function Search-Shodan {
                 switch ($Message) {
                     {$_ -like "*request timed out*"} {
 
-                        [Int32]$PercentComplete = ( $MatchResults.Count / $ResponseContent.total ) * 100
                         $ProgressArgs = @{
                             Activity            = "Downloading results for Shodan query: $ShodanQueryString"
                             CurrentOperation    = "Downloaded $($MatchResults.Count) of $($ResponseContent.total) matches"
-                            PercentComplete     = $PercentComplete
                             Status              = "The request timed out--retrying in 5 seconds..."
                         }
             
