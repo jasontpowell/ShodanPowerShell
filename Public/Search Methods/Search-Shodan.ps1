@@ -552,7 +552,12 @@ function Search-Shodan {
 
 
         for (($CurrentPage = 1), ($CompletedAllPages = $false); $CompletedAllPages -ne $true; $CurrentPage++) {
-            $RequestArgs["Body"]["page"] = $CurrentPage
+
+            if ($LastRequestSucceeded -eq $false) {
+                $RequestArgs["Body"]["page"] = $CurrentPage--
+            } else {
+                $RequestArgs["Body"]["page"] = $CurrentPage
+            }
 
             try {
                 $Response = Invoke-WebRequest @RequestArgs -ErrorAction Stop
@@ -576,6 +581,8 @@ function Search-Shodan {
                     $CompletedAllPages = $true
                 }
 
+                $LastRequestSucceeded = $true
+
                 Start-Sleep -Seconds 1
             }
             catch {
@@ -594,7 +601,7 @@ function Search-Shodan {
                         Write-Progress @ProgressArgs
 
                         Start-Sleep -Seconds 5
-                        $CurrentPage--
+                        $LastRequestSucceeded = $false
                     }
                     Default {
                         $QueryParameters["key"] = $null
